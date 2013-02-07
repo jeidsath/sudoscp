@@ -1,0 +1,141 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import subprocess
+import sys
+
+ARGS = None
+TEMPDIR = '/tmp/_sudoscp'
+
+FABRIC_FILE = """
+from fabric.api import *
+env.use_ssh_config = True
+env.shell = '/bin/bash -c'
+
+import os
+import time
+
+def putfile(user, local, remote):
+    filename = str(int(time.time() * 10**6))
+    put(local_path=local, remote_path='/tmp/' + filename, mode=0755)
+    realname = os.path.basename(local)
+    with settings(sudo_user=user):
+
+        cmd = 'cp /tmp/%(filename)s %(remote)s' % locals()
+        sudo(cmd)
+        cmd = ('if [ -f %(remote)s/%(filename)s ] ;'
+               + ' then mv -f %(remote)s/%(filename)s'
+               + ' %(remote)s/%(realname)s ; fi') % locals()
+        sudo(cmd)
+    cmd = 'rm /tmp/%(filename)s' % locals()
+    run(cmd)
+
+
+def getfile(user, remote, local):
+    with settings(sudo_user=user):
+        sudo('rm -rf /tmp/_sudofabscp')
+        sudo('mkdir /tmp/_sudofabscp')
+        sudo('cp %(remote)s /tmp/_sudofabscp/' % locals())
+        sudo('chmod -R 777 /tmp/_sudofabscp')
+        get('/tmp/_sudofabscp/*', local)
+        sudo('rm -rf /tmp/_sudofabscp')
+"""
+
+
+def is_remote(ss):
+    if ss.find('@') != -1 or ss.find(':') != -1:
+        return True
+    else:
+        return False
+
+
+def parse_remote(ss):
+    if ss.find('@') == -1 or ss.find(':') == -1:
+        print "sudoscp needs user@host:path for its remote string."
+        sys.exit(1)
+
+    user = ss.split('@')[0]
+    host = ss.split('@')[1].split(':')[0]
+    path = ss.split('@')[1].split(':')[1]
+
+    return {'user': user, 'host': host, 'path': path}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Fab scp')
+    parser.add_argument("source")
+    parser.add_argument("destination")
+    global ARGS
+    ARGS = parser.parse_args()
+
+    #one argument should have a user@host:path and the other should be a path
+    #to a file
+
+    if is_remote(ARGS.source) and is_remote(ARGS.destination):
+        parser.error("Both destination and source cannot be remote.")
+
+
+def writetempfabric():
+    try:
+        os.makedirs(TEMPDIR)
+    except OSError:
+        pass
+    with open('/'.join([TEMPDIR, 'fabfile.py']), 'w') as FF:
+        FF.write(FABRIC_FILE)
+
+
+def cleanup():
+    if os.path.exists(TEMPDIR):
+        os.remove('/'.join([TEMPDIR, 'fabfile.py']))
+        try:
+            os.remove('/'.join([TEMPDIR, 'fabfile.pyc']))
+        except OSError:
+            pass
+        os.rmdir(TEMPDIR)
+
+
+def getfile():
+    dest_args = parse_remote(ARGS.source)
+    dest_args['local_path'] = ARGS.destination
+    dest_args['remote_path'] = dest_args['path']
+
+    if len(dest_args['path']) == 0 or dest_args['path'][0] != '/':
+        dest_args['remote_path'] = '/'.join(['/home', dest_args['user'],
+                                             dest_args['path']])
+    else:
+        dest_args['remote_path'] = dest_args['path']
+
+    dest_args['TEMPDIR'] = TEMPDIR
+    cmd = 'cd %(TEMPDIR)s; fab -H %(host)s \
+getfile:"%(user)s,%(remote_path)s,%(local_path)s"' % dest_args
+    subprocess.call(cmd, shell=True)
+
+
+def putfile():
+    dest_args = parse_remote(ARGS.destination)
+    dest_args['TEMPDIR'] = TEMPDIR
+    dest_args['local_path'] = os.path.abspath(ARGS.source)
+    dest_args['filename'] = os.path.basename(ARGS.source)
+    if len(dest_args['path']) == 0 or dest_args['path'][0] != '/':
+        dest_args['remote_path'] = '/'.join(['/home', dest_args['user'],
+                                             dest_args['path']])
+    else:
+        dest_args['remote_path'] = dest_args['path']
+    cmd = "cd %(TEMPDIR)s; fab -H %(host)s \
+putfile:'%(user)s,%(local_path)s,%(remote_path)s'" % dest_args
+    subprocess.call(cmd, shell=True)
+
+
+def main():
+    parse_args()
+
+    writetempfabric()
+    if is_remote(ARGS.source):
+        getfile()
+    else:
+        putfile()
+    cleanup()
+
+if __name__ == "__main__":
+    main()
