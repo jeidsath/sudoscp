@@ -2,11 +2,12 @@
 
 import argparse
 import os
+import random
 import subprocess
 import sys
 
 ARGS = None
-TEMPDIR = '/tmp/_sudoscp'
+TEMPDIR = '/tmp/_' + int(random.random() * 10**12) + 'sudoscp'
 
 FABRIC_FILE = """
 from fabric.api import *
@@ -92,7 +93,8 @@ def cleanup():
             os.remove('/'.join([TEMPDIR, 'fabfile.pyc']))
         except OSError:
             pass
-        os.rmdir(TEMPDIR)
+        cmd = ['rm', '-r', '-f', TEMPDIR]
+        subprocess.call(cmd)
 
 
 def getfile():
