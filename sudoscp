@@ -88,11 +88,6 @@ def writetempfabric():
 
 def cleanup():
     if os.path.exists(TEMPDIR):
-        os.remove('/'.join([TEMPDIR, 'fabfile.py']))
-        try:
-            os.remove('/'.join([TEMPDIR, 'fabfile.pyc']))
-        except OSError:
-            pass
         cmd = ['rm', '-r', '-f', TEMPDIR]
         subprocess.call(cmd)
 
