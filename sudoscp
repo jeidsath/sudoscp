@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ARGS = None
-TEMPDIR = '/tmp/_' + int(random.random() * 10**12) + 'sudoscp'
+TEMPDIR = '/tmp/_' + str(int(random.random() * 10**12)) + 'sudoscp'
 
 FABRIC_FILE = """
 from fabric.api import *
