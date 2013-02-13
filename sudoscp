@@ -15,7 +15,10 @@ env.use_ssh_config = True
 env.shell = '/bin/bash -c'
 
 import os
+import random
 import time
+
+TEMPDIR = '/tmp/_' + str(int(random.random() * 10**12)) + 'sudofabscp'
 
 def putfile(user, local, remote):
     filename = str(int(time.time() * 10**6))
@@ -35,12 +38,12 @@ def putfile(user, local, remote):
 
 def getfile(user, remote, local):
     with settings(sudo_user=user):
-        sudo('rm -rf /tmp/_sudofabscp')
-        sudo('mkdir /tmp/_sudofabscp')
-        sudo('cp %(remote)s /tmp/_sudofabscp/' % locals())
-        sudo('chmod -R 777 /tmp/_sudofabscp')
-        get('/tmp/_sudofabscp/*', local)
-        sudo('rm -rf /tmp/_sudofabscp')
+        sudo('rm -rf ' + TEMPDIR)
+        sudo('mkdir ' + TEMPDIR)
+        sudo(('cp %(remote)s ' + TEMPDIR) % locals())
+        sudo('chmod -R 777 ' + TEMPDIR)
+        get(TEMPDIR + '*', local)
+        sudo('rm -rf ' + TEMPDIR)
 """
 
 
