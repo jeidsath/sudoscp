@@ -42,7 +42,8 @@ def getfile(user, remote, local):
         sudo('mkdir ' + TEMPDIR)
         sudo(('cp %(remote)s ' + TEMPDIR) % locals())
         sudo('chmod -R 777 ' + TEMPDIR)
-        get(TEMPDIR + '*', local)
+        with cd(TEMPDIR):
+            get('*', local)
         sudo('rm -rf ' + TEMPDIR)
 """
 
@@ -97,7 +98,11 @@ def cleanup():
 
 def getfile():
     dest_args = parse_remote(ARGS.source)
-    dest_args['local_path'] = ARGS.destination
+    if os.path.exists(ARGS.destination):
+        dest_args['local_path'] = os.path.abspath(ARGS.destination)
+    else:
+        dest_args['local_path'] = '/'.join([os.path.abspath(os.path.dirname(
+            ARGS.destination)), os.path.basename(ARGS.destination)])
     dest_args['remote_path'] = dest_args['path']
 
     if len(dest_args['path']) == 0 or dest_args['path'][0] != '/':
